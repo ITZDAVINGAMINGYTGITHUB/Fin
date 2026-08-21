@@ -1,0 +1,10 @@
+<svg width="256" height="256" viewBox="0 0 256 256" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="finGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#4FA7B8"/>
+      <stop offset="100%" style="stop-color:#6BC7D7"/>
+    </linearGradient>
+  </defs>
+  <!-- Abstract fin shape that also resembles a forward arrow -->
+  <path d="M128 48c32 0 56 16 68 48s-8 64-40 76c-16 6-32 2-44-8-12 10-28 12-44 4-24-16-36-44-20-72 16-28 44-48 80-48z" fill="url(#finGrad)"/>
+</svg>
