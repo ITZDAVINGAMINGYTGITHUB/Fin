@@ -11,13 +11,15 @@ const ThemeManager = require('../services/theme');
 // Keep a global reference of the window object
 let mainWindow = null;
 let windows = new Map(); // Track all windows by ID
+let db = null;
+let storage = null;
 
-// Initialize database
-const dbPath = path.join(app.getPath('userData'), 'fin-data.db');
-const db = new Database(dbPath);
-
-// Initialize storage service
-const storage = new StorageService(db);
+function initializeApp() {
+  // Initialize database (must be called after app.whenReady())
+  const dbPath = path.join(app.getPath('userData'), 'fin-data.db');
+  db = new Database(dbPath);
+  storage = new StorageService(db);
+}
 
 function createWindow(options = {}) {
   const isPrivate = options.isPrivate || false;
@@ -68,14 +70,6 @@ function createWindow(options = {}) {
 function createMainWindow() {
   mainWindow = createWindow({ isPrivate: false, profile: 'default' });
 }
-
-// App lifecycle
-app.whenReady().then(() => {
-  // Initialize database tables
-  storage.initialize();
-  
-  createMainWindow();
-});
 
 // Handle app re-activation (macOS)
 app.on('activate', () => {
@@ -220,42 +214,58 @@ ipcMain.handle('get-user-data-path', () => {
   return app.getPath('userData');
 });
 
-// Session handlers for downloads
-session.defaultSession.on('will-download', (event, item, webContents) => {
-  const downloadId = uuidv4();
-  
-  item.on('updated', (event, state) => {
-    if (state === 'interrupted') {
-      console.log('Download interrupted');
-    } else if (state === 'progressing') {
-      if (item.isPaused()) {
-        console.log('Download paused');
-      } else {
-        console.log(`Downloading: ${item.getReceivedBytes()} / ${item.getTotalBytes()}`);
+// Session handlers for downloads - must be set up after app is ready
+function setupSessionHandlers() {
+  session.defaultSession.on('will-download', (event, item, webContents) => {
+    const downloadId = uuidv4();
+    
+    item.on('updated', (event, state) => {
+      if (state === 'interrupted') {
+        console.log('Download interrupted');
+      } else if (state === 'progressing') {
+        if (item.isPaused()) {
+          console.log('Download paused');
+        } else {
+          console.log(`Downloading: ${item.getReceivedBytes()} / ${item.getTotalBytes()}`);
+        }
       }
-    }
-    
-    // Notify renderer
-    webContents.send('download-progress', {
-      downloadId,
-      receivedBytes: item.getReceivedBytes(),
-      totalBytes: item.getTotalBytes(),
-      state: item.getState(),
+      
+      // Notify renderer
+      webContents.send('download-progress', {
+        downloadId,
+        receivedBytes: item.getReceivedBytes(),
+        totalBytes: item.getTotalBytes(),
+        state: item.getState(),
+      });
     });
-  });
 
-  item.once('done', (event, state) => {
-    if (state === 'completed') {
-      console.log('Download completed');
-    } else {
-      console.log(`Download failed: ${state}`);
-    }
-    
-    // Notify renderer
-    webContents.send('download-done', {
-      downloadId,
-      state,
-      filePath: item.getSavePath(),
+    item.once('done', (event, state) => {
+      if (state === 'completed') {
+        console.log('Download completed');
+      } else {
+        console.log(`Download failed: ${state}`);
+      }
+      
+      // Notify renderer
+      webContents.send('download-done', {
+        downloadId,
+        state,
+        filePath: item.getSavePath(),
+      });
     });
   });
+}
+
+// App lifecycle
+app.whenReady().then(() => {
+  // Initialize database and storage
+  initializeApp();
+  
+  // Initialize database tables
+  storage.initialize();
+  
+  // Set up session handlers for downloads
+  setupSessionHandlers();
+  
+  createMainWindow();
 });
